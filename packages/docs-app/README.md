@@ -41,11 +41,11 @@ The prd iterate project serves it at `docs--iterate.iterate.app` and `docs.itera
 members-only fetch routes on the project, one by routing slug and one by hostname, to the prd
 Worker.
 
-What's next: [tasks/complete/2026-09-30-docs-app.md](../../tasks/complete/2026-09-30-docs-app.md),
+What's next: `tasks/complete/2026-09-30-docs-app.md`,
 "Later".
 
 Local dev is Notes': `pnpm dev`, reached through a project behind `iterate tunnel`
-([Notes' README](../notes/README.md)). The browser proof is [test/playwright/docs](../../test/playwright/docs).
+([Notes' README](../notes/README.md)). The browser proof is `test/playwright/docs`.
 
-Deploy: `pnpm --dir apps/docs run deploy --env prd`. Docs has no secrets, so it deploys from
+Deploy: `pnpm --dir packages/docs-app run deploy --env prd`. Docs has no secrets, so it deploys from
 `_shared`'s `prd` Doppler config (`dopplerProject` in [scripts/app.ts](scripts/app.ts)).
