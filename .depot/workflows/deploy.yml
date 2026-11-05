@@ -1,9 +1,10 @@
 name: Deploy
 
 # DOCS AT MAIN: every main push that changes what the Worker ships deploys `preview`
-# (docs.iterate-dev-preview.workers.dev) and then, once that answers, `prd` (docs.iterate.workers.dev,
-# which the iterate project's `docs` slug and docs.iterate.com route to), both from envs.ts. A red run
-# pages.
+# (docs.iterate-dev-preview.workers.dev), runs the browser specs against it (test/playwright/docs, on
+# main on dev's platform, installing this commit's @iterate-com/docs from pkg.pr.new), and then, once
+# they pass, deploys `prd` (docs.iterate.workers.dev, which the iterate project's `docs` slug and
+# docs.iterate.com route to), both from envs.ts. A red run pages.
 permissions:
   contents: read
 
@@ -40,10 +41,41 @@ jobs:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
         run: pnpm --dir packages/docs-app run-script deploy --env preview
 
-  # only after preview answered: a deploy that fails there never reaches production
+  specs:
+    name: Browser specs against preview
+    needs: preview
+    # six browsers at once (test/playwright.config.ts `workers`)
+    runs-on: depot-ubuntu-24.04-4
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Setup
+        uses: ./.depot/actions/setup
+      - name: Browser
+        run: pnpm --dir test exec playwright install --only-shell chromium
+      - name: Specs
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+          PUBLISHED_PACKAGE_COMMIT: ${{ github.sha }}
+          WORKER_BASE_URL: https://os.iterate-dev-preview.workers.dev
+          DOCS_BASE_URL: https://docs.iterate-dev-preview.workers.dev
+        run: doppler run --project os --config preview -- pnpm spec
+      - name: Upload the report
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: test-results/
+          retention-days: 14
+
+  # only after preview passed its specs: a deploy that fails there never reaches production
   prd:
     name: Deploy prd
-    needs: preview
+    needs: specs
     runs-on: depot-ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -62,6 +94,7 @@ jobs:
   page:
     needs:
       - preview
+      - specs
       - prd
     if: always() && github.ref == 'refs/heads/main' && contains(needs.*.result, 'failure')
     runs-on: depot-ubuntu-24.04

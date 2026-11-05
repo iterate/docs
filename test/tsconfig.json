@@ -1,0 +1,9 @@
+{
+  // The browser specs, their config and helpers. DOM types: a spec's callbacks run in the page.
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2024", "ESNext.Disposable", "DOM", "DOM.Iterable"],
+    "types": ["node"]
+  },
+  "include": ["**/*.ts"]
+}

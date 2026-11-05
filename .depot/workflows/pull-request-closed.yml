@@ -1,0 +1,35 @@
+name: Pull request closed
+
+# A CLOSED PULL REQUEST'S DOCS WORKER, `docs-pr<N>` (specs.yml deployed it), deleted. Its own
+# workflow, so no push to an open pull request carries it as a skipped job. Depot registers the
+# `closed` trigger once this file is on the default branch. By hand:
+#   pnpm --dir packages/docs-app delete-pull-request --pr <N>
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    types:
+      - closed
+
+concurrency:
+  # waits for the pull request's specs run to settle instead of deleting its Worker from under it
+  group: specs-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  delete:
+    name: Delete the pull request's Docs
+    runs-on: depot-ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Setup
+        uses: ./.depot/actions/setup
+      - name: Delete
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        run: pnpm --dir packages/docs-app delete-pull-request --pr ${{ github.event.pull_request.number }}

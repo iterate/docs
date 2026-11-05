@@ -1,5 +1,6 @@
 packages:
   - packages/*
+  - test
 # Every dependency both packages use is pinned here once and written `catalog:` in each package.json,
 # as in iterate/private, whose catalog these versions are copied from; a dependency only one package
 # uses keeps its version in that package.json.

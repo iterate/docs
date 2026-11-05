@@ -2,6 +2,9 @@
  * The Docs app's command line, behind its package scripts:
  *
  *   deploy --env <name>        vite build for that env → wrangler deploy → /healthz smoke
+ *   delete-pull-request --pr <n>
+ *                              delete a closed pull request's own Worker, `docs-pr<n>` (envs.ts
+ *                              `pullRequestEnv`); no other Worker is ever deleted
  *   generate-route-tree        regenerate src/routeTree.gen.ts outside `vite dev`/`vite build`;
  *                              `--check` fails (and restores the file) when the checked-in tree is stale
  *
@@ -16,7 +19,7 @@ import { fileURLToPath } from "node:url";
 import { Generator, getConfig } from "@tanstack/router-generator";
 import { createCli, t } from "trpc-cli";
 import { z } from "zod";
-import { getEnv } from "../../../envs.ts";
+import { getEnv, pullRequestEnv } from "../../../envs.ts";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 
@@ -39,10 +42,7 @@ async function deploy(options: { env: string }) {
   console.log(
     `Deploying Docs to ${options.env} (worker ${env.workerName}, account ${env.cloudflareAccountId})`,
   );
-  const token = execFileSync("doppler", ["secrets", "get", "CLOUDFLARE_API_TOKEN", "--plain"], {
-    encoding: "utf8",
-    env: { ...process.env, DOPPLER_PROJECT: "_shared", DOPPLER_CONFIG: env.dopplerConfig },
-  }).trim();
+  const token = cloudflareToken(env.dopplerConfig);
   rmSync(path.join(root, "dist"), { recursive: true, force: true });
   run("pnpm", ["exec", "vite", "build"], { CLOUDFLARE_ENV: options.env });
   const credentials = {
@@ -71,6 +71,35 @@ async function deploy(options: { env: string }) {
   }
   await smoke(`${env.baseUrl}/healthz`);
   console.log(`✅ ${options.env} deployed and serving at ${env.baseUrl}`);
+}
+
+/** Deletes pull request `pr`'s own Worker, which its CI deployed (envs.ts `pullRequestEnv`). One
+ *  already gone (a pull request whose CI never deployed) is no error. */
+async function deletePullRequest(options: { pr: number }) {
+  const env = pullRequestEnv(`pr${options.pr}`)!;
+  const response = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${env.cloudflareAccountId}/workers/scripts/${env.workerName}`,
+    {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${cloudflareToken(env.dopplerConfig)}` },
+      signal: AbortSignal.timeout(30_000),
+    },
+  );
+  if (response.status === 404) return console.log(`${env.workerName} is already gone`);
+  if (!response.ok)
+    throw new Error(
+      `deleting ${env.workerName} answered ${response.status}: ${await response.text()}`,
+    );
+  console.log(`deleted ${env.workerName}`);
+}
+
+/** The Cloudflare token every iterate app deploys with, Doppler `_shared`'s, for one of its configs.
+ *  Doppler's CLI authenticates with DOPPLER_TOKEN in CI and the developer's login elsewhere. */
+function cloudflareToken(dopplerConfig: string) {
+  return execFileSync("doppler", ["secrets", "get", "CLOUDFLARE_API_TOKEN", "--plain"], {
+    encoding: "utf8",
+    env: { ...process.env, DOPPLER_PROJECT: "_shared", DOPPLER_CONFIG: dopplerConfig },
+  }).trim();
 }
 
 /** Probes `url` until it answers 200: a new version takes a few seconds to reach every colo. */
@@ -167,6 +196,9 @@ if (import.meta.main)
       deploy: t.procedure
         .input(z.object({ env: z.string().describe("Target environment name from envs.ts") }))
         .handler(({ input }) => deploy(input)),
+      deletePullRequest: t.procedure
+        .input(z.object({ pr: z.number().int().positive().describe("The pull request's number") }))
+        .handler(({ input }) => deletePullRequest(input)),
       generateRouteTree: t.procedure
         .input(
           z.object({

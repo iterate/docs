@@ -16,6 +16,9 @@ dist
 
 __pycache__/
 
+# what a browser spec run leaves (test/playwright.config.ts)
+test-results/
+
 # ad-hoc ignored files/paths
 *ignoreme*
 *.log

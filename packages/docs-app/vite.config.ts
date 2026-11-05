@@ -7,7 +7,7 @@ import { COMPATIBILITY_DATE } from "iterate/compatibility-date";
 import { defineConfig } from "vite";
 import type { z } from "zod";
 import type { StartAppConfig } from "./src/app/start-app-config.ts";
-import { DENY_ZONES, docsEnvs, getEnv } from "../../envs.ts";
+import { DENY_ZONES, docsEnvs, getEnv, pullRequestEnv } from "../../envs.ts";
 import { routeTreeStyle } from "./scripts/app.ts";
 
 export default defineConfig({
@@ -52,7 +52,7 @@ function workerConfig(envName: string | undefined) {
     urls: { ...linked.urls, docs: linked.baseUrl },
     denyZones: DENY_ZONES,
     ...(env?.posthogProjectKey && { posthogProjectKey: env.posthogProjectKey }),
-    pkgPrNewRef: "main",
+    pkgPrNewRef: envName && pullRequestEnv(envName) ? pullRequestCommit() : "main",
   } satisfies z.input<typeof StartAppConfig>;
   return {
     name: env?.workerName || "docs",
@@ -88,4 +88,15 @@ function workerConfig(envName: string | undefined) {
     // a workers.dev origin, served by workers_dev itself: no route
     ...(env && { account_id: env.cloudflareAccountId, workers_dev: true }),
   };
+}
+
+/** The commit whose @iterate-com/docs a pull request's Docs installs (`PUBLISHED_PACKAGE_COMMIT`,
+ *  its head, which pkg.pr.new publishes; .depot/workflows/specs.yml sets it). */
+function pullRequestCommit() {
+  const commit = process.env.PUBLISHED_PACKAGE_COMMIT;
+  if (!commit || !/^[0-9a-f]{40}$/.test(commit))
+    throw new Error(
+      `a pull request's Docs installs its head's build: PUBLISHED_PACKAGE_COMMIT is ${JSON.stringify(commit)}, not a commit's 40 hex digits`,
+    );
+  return commit;
 }
