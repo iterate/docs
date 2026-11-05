@@ -57,7 +57,7 @@ const formattingKeymap = Prec.highest(
   ),
 );
 
-/** Atomic's colours from the app's theme (packages/ui globals.css): Atomic's own defaults are a
+/** Atomic's colours from the app's theme (src/styles/globals.css): Atomic's own defaults are a
  *  dark theme, inline code and code blocks' syntax colours included (the `hl-` ones, GitHub's
  *  dark palette here; a fence's language name is `hl-variable`). */
 const theme = EditorView.theme({

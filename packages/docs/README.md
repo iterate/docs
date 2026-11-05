@@ -39,5 +39,6 @@ const doc = await ensureDoc(project, { repo: "/repos/config", path: "plans/lisbo
 const { update, stateVector } = await doc.facets.get("doc").sync(myStateVector, myClientId);
 ```
 
-Published per commit on pkg.pr.new (`.github/workflows/pkg-pr-new.yml`). `pnpm test` runs the
+Published per commit on pkg.pr.new (`.github/workflows/pkg-pr-new.yml`), and from main to npm under
+the `main` and `latest` dist-tags (`.github/workflows/npm-publish.yml`). `pnpm test` runs the
 processors over an in-memory stream, node:sqlite and a fake repo.

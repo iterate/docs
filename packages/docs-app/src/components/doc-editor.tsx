@@ -20,18 +20,18 @@ import {
   TextQuote,
   Undo2,
 } from "lucide-react";
-import { AppShellPageHeader, AppShellPageMenu } from "@iterate-com/ui/components/app-shell";
-import { StreamLink, streamHref, type StreamTarget } from "@iterate-com/ui/components/stream-link";
-import { Button } from "@iterate-com/ui/components/ui/button";
+import { AppShellPageHeader, AppShellPageMenu } from "#/components/app-shell.tsx";
+import { StreamLink, streamHref, type StreamTarget } from "#/components/stream-link.tsx";
+import { Button } from "#/components/ui/button.tsx";
 import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
-} from "@iterate-com/ui/components/ui/dropdown-menu";
-import { NativeSelect, NativeSelectOption } from "@iterate-com/ui/components/ui/native-select";
-import { Separator } from "@iterate-com/ui/components/ui/separator";
+} from "#/components/ui/dropdown-menu.tsx";
+import { NativeSelect, NativeSelectOption } from "#/components/ui/native-select.tsx";
+import { Separator } from "#/components/ui/separator.tsx";
 import {
   insertBlock,
   promptLink,

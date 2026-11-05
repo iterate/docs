@@ -1,0 +1,26 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 100,
+  "tabWidth": 2,
+  "useTabs": false,
+  "semi": true,
+  "singleQuote": false,
+  "quoteProps": "as-needed",
+  "trailingComma": "all",
+  "bracketSpacing": true,
+  "bracketSameLine": false,
+  "arrowParens": "always",
+  "endOfLine": "lf",
+  "embeddedLanguageFormatting": "auto",
+  "sortPackageJson": false,
+  "ignorePatterns": [
+    "node_modules/",
+    "dist/",
+    ".wrangler/",
+    "routeTree.gen.ts",
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
+    "packages/docs-app/src/components/ui/",
+    "packages/docs-app/src/hooks/use-mobile.ts"
+  ]
+}

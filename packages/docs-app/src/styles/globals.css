@@ -1,0 +1,128 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+/* shadcn's own Tailwind layer, which the vendored components are written against: the data-* variants
+   that match Base UI's attributes and skip a "false" value (cmdk renders data-selected="false"),
+   no-scrollbar, scroll-fade and shimmer. The `shadcn` devDependency pins it with the CLI.
+   https://ui.shadcn.com/docs/tailwind-v4 */
+@import "shadcn/tailwind.css";
+/* What our components use beyond shadcn's own variables. */
+@import "./tokens.css";
+
+@source "../**/*.{ts,tsx}";
+
+/* Every page is dark, so `dark:` always applies: the vendored components' and Streamdown's
+   dark-mode classes are the ones that fit. */
+@custom-variant dark (&);
+
+/* On a phone every sheet fills the screen (iterate/iterate#1883), where upstream's are 3/4 wide. Each SheetContent
+   call site passes `data-[side=right]:w-full` (as wide as its max-width allows from `sm` up, too);
+   below `sm` (40rem) this rule also covers a sheet whose call site doesn't, and the phone's sidebar,
+   a sheet the vendored sidebar.tsx renders with no className to pass, by its slot. Keyed on the
+   sheet's own data-slot: Base UI puts data-side on every positioned popup. Unlayered, so it
+   outranks the utilities layer's `data-[side=…]:w-3/4`. */
+@media (width < 40rem) {
+  [data-slot="sheet-content"]:is([data-side="left"], [data-side="right"]),
+  [data-slot="sidebar"][data-mobile="true"] {
+    width: 100%;
+  }
+}
+
+/* Pierre's file tree (the repo IDE's, the docs app's sidebar) says `color-scheme: light dark` on its
+   own element from inside its shadow root, so it would follow the OS. A rule from the page wins over
+   one from the shadow root. */
+file-tree-container {
+  color-scheme: dark;
+}
+
+/* The agent chat's streamed-token reveal (agent-chat/streaming-text.tsx): `both` keeps a token invisible until its
+   animation-delay elapses, so a window's tokens fan in across the ~150ms between coalesced
+   chunk events. */
+@keyframes token-in {
+  from {
+    opacity: 0;
+  }
+}
+.animate-token-in {
+  animation: token-in 120ms both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-token-in {
+    animation: none;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* shadcn's neutral palette, its dark values (upstream's `.dark` block): every page is dark.
+   color-scheme makes the native controls and scrollbars dark too. */
+:root {
+  color-scheme: dark;
+  --radius: 0.625rem;
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}

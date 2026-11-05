@@ -1,18 +1,13 @@
 import { createServerEntry } from "@tanstack/react-start/server-entry";
 import { createStartHandler, defaultStreamHandler } from "@tanstack/react-start/server";
-import { appServerEntry } from "@iterate-com/ui/apps/server";
-import {
-  basePathOf,
-  buildBasePath,
-  underBasePath,
-  withoutBuildBasePath,
-} from "@iterate-com/ui/apps/base-path";
-// Every app's Worker config binds the class (scripts/lib/start-app.ts startAppWorkerConfig); Docs
+import { appServerEntry } from "#/app/server.ts";
+import { basePathOf, buildBasePath, underBasePath, withoutBuildBasePath } from "#/app/base-path.ts";
+// Every app's Worker config binds the class (vite.config.ts `workerConfig`); Docs
 // signs no one in (a project host signs people in), so it holds no session.
 export { BrowserSession } from "iterate/app-session";
 
 /** TanStack Start's pages, their scripts and stylesheets under the request's base path
- *  (@iterate-com/ui/apps/base-path) — per request, since a proxied page names its own. */
+ *  (src/app/base-path.ts) — per request, since a proxied page names its own. */
 const start = createStartHandler({
   handler: defaultStreamHandler,
   transformAssets: {
@@ -41,7 +36,7 @@ const docs = appServerEntry(
 );
 
 /** Docs is served on a project's `docs` routing slug (a members-only fetch route to this Worker),
- *  under the base path the edge says (@iterate-com/ui/apps/base-path). */
+ *  under the base path the edge says (src/app/base-path.ts). */
 export default createServerEntry({
   fetch: (incoming) => docs.fetch(withoutBuildBasePath(incoming)),
 });

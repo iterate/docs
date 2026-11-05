@@ -1,0 +1,80 @@
+name: Deploy
+
+# DOCS AT MAIN: every main push that changes what the Worker ships deploys `preview`
+# (docs.iterate-dev-preview.workers.dev) and then, once that answers, `prd` (docs.iterate.workers.dev,
+# which the iterate project's `docs` slug and docs.iterate.com route to), both from envs.ts. A red run
+# pages.
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "**"
+      - "!**/*.md"
+      - "!.github/**"
+      - "!scripts/ci/npm-publish*"
+  workflow_dispatch:
+
+jobs:
+  preview:
+    name: Deploy preview
+    runs-on: depot-ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Setup
+        uses: ./.depot/actions/setup
+      - name: Deploy
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        run: pnpm --dir packages/docs-app run-script deploy --env preview
+
+  # only after preview answered: a deploy that fails there never reaches production
+  prd:
+    name: Deploy prd
+    needs: preview
+    runs-on: depot-ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Setup
+        uses: ./.depot/actions/setup
+      - name: Deploy
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        run: pnpm --dir packages/docs-app run-script deploy --env prd
+
+  page:
+    needs:
+      - preview
+      - prd
+    if: always() && github.ref == 'refs/heads/main' && contains(needs.*.result, 'failure')
+    runs-on: depot-ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Toolchain
+        run: bash scripts/ci/toolchain.sh start && bash scripts/ci/toolchain.sh wait
+      - name: Page #error-pulse
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+          NEEDS: ${{ toJSON(needs) }}
+        run: node scripts/ci/page.ts

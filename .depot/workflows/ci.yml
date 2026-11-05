@@ -1,0 +1,45 @@
+name: CI
+
+# The checks every pull request and main push runs: typecheck, lint, format, and the Vitest suites
+# (@iterate-com/docs' processors and the CI scripts).
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  check:
+    name: Typecheck, lint and test
+    runs-on: depot-ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Setup
+        uses: ./.depot/actions/setup
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Lint
+        if: ${{ !cancelled() }}
+        run: pnpm lint
+      - name: Format
+        if: ${{ !cancelled() }}
+        run: pnpm format:check
+      - name: Test
+        if: ${{ !cancelled() }}
+        run: pnpm test
+      - name: Build the Docs app
+        if: ${{ !cancelled() }}
+        run: pnpm --dir packages/docs-app build

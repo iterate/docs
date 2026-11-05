@@ -7,7 +7,7 @@ import {
   useRouterState,
 } from "@tanstack/react-router";
 import { useMemo, useSyncExternalStore } from "react";
-import { ProjectAppFrame, ProjectAppShell } from "@iterate-com/ui/components/project-app-shell";
+import { ProjectAppFrame, ProjectAppShell } from "#/components/project-app-shell.tsx";
 import { DocsNav } from "../../components/docs-nav.tsx";
 import { DocList, DocListContext } from "../../lib/doc-list.ts";
 import { repoNames, repoPath } from "../../lib/docs-repo.ts";

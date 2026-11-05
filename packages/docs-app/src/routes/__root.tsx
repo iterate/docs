@@ -1,9 +1,9 @@
 import { createRootRouteWithContext } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { AppDocument } from "@iterate-com/ui/apps/document";
-import { appHead } from "@iterate-com/ui/apps/head";
-import { startAppConfigOf } from "@iterate-com/shared/start-app-config";
-import { underBasePath } from "@iterate-com/ui/apps/base-path";
+import { AppDocument } from "#/app/document.tsx";
+import { appHead } from "#/app/head.ts";
+import { startAppConfigOf } from "#/app/start-app-config.ts";
+import { underBasePath } from "#/app/base-path.ts";
 import css from "../styles.css?url";
 /** What the worker's `ITERATE_APP` says about this deployment: its PostHog project key (envs.ts,
  *  prd only) and its dash, where a doc's "Stream ↗" goes (`urls.dash`; null when it names none). */
@@ -16,7 +16,7 @@ const deployment = createServerFn().handler(async () => {
   };
 });
 
-/** `basePath`: the path this page is served under, "" on a project host of its own (@iterate-com/ui/apps/base-path). */
+/** `basePath`: the path this page is served under, "" on a project host of its own (src/app/base-path.ts). */
 export const Route = createRootRouteWithContext<{ basePath: string }>()({
   loader: () => deployment(),
   staleTime: Infinity,

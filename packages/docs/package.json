@@ -5,7 +5,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/iterate/packages",
+    "url": "git+https://github.com/iterate/docs",
     "directory": "packages/docs"
   },
   "type": "module",
@@ -61,7 +61,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",
-    "iterate": "workspace:*",
+    "iterate": "catalog:",
     "node-diff3": "3.2.1",
     "tsdown": "catalog:",
     "typescript": "catalog:",
