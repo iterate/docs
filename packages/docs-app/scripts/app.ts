@@ -74,11 +74,13 @@ async function deploy(options: { env: string }) {
 }
 
 /** Deletes pull request `pr`'s own Worker, which its CI deployed (envs.ts `pullRequestEnv`). One
- *  already gone (a pull request whose CI never deployed) is no error. */
+ *  already gone (a pull request whose CI never deployed) is no error. `force=true` because the
+ *  Worker owns a Durable Object class (BrowserSession), and Cloudflare refuses to delete such a
+ *  script without it; the class's storage goes with the Worker, as it should here. */
 async function deletePullRequest(options: { pr: number }) {
   const env = pullRequestEnv(`pr${options.pr}`)!;
   const response = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${env.cloudflareAccountId}/workers/scripts/${env.workerName}`,
+    `https://api.cloudflare.com/client/v4/accounts/${env.cloudflareAccountId}/workers/scripts/${env.workerName}?force=true`,
     {
       method: "DELETE",
       headers: { authorization: `Bearer ${cloudflareToken(env.dopplerConfig)}` },
