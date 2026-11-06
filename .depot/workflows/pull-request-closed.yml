@@ -23,9 +23,12 @@ jobs:
     runs-on: depot-ubuntu-24.04
     timeout-minutes: 10
     steps:
+      # main's code, not the pull request's: a head whose install broke still gets its Worker
+      # deleted, and none of its code runs with the Doppler token
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          ref: main
           persist-credentials: false
       - name: Setup
         uses: ./.depot/actions/setup
