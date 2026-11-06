@@ -11,7 +11,7 @@
 import { FileTree } from "@pierre/trees";
 import type { DocList } from "../lib/doc-list.ts";
 
-/** Pierre's colours from the sidebar's (packages/ui globals.css). */
+/** Pierre's colours from the sidebar's (src/styles/globals.css). */
 const treeTheme: Record<string, string> = {
   // the sidebar's own, not transparent: a truncated name's "…" is painted over in this colour
   "--trees-bg-override": "var(--sidebar)",

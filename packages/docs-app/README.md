@@ -1,16 +1,20 @@
 # Docs
 
-A project's docs: the markdown files in its repos (`/repos/config` first), written in the browser. Served
-like [Notes](../notes/README.md): a project routes its `docs` routing slug to this Worker
+A project's docs: the markdown files in its repos (`/repos/config` first), written in the browser.
+Served like iterate's Notes app: a project routes its `docs` routing slug to this Worker
 (`docsEnvs` in the root `envs.ts`) with a members-only fetch route, so it's
 `docs--<project>.iterate.app` under subdomains and `<platform>/projects/<project>/docs/` under
-paths (a PR preview's `pr<N>` gets that route from its seed, scripts/os/preview-config.ts
-`proxiedAppRoute`). The project installs Docs in its config repo, as it does agents: a `docs.ts`
-re-exporting `@iterate-com/docs`'s processors and a pin in its root `package.json`
-([packages/docs](../../packages/docs/README.md)); the page says so when a project hasn't. The page signs in on its host's `/.auth/*` and talks to its
-host's `/api`, both the platform's; Docs has no OAuth client, no secrets and no state of its own.
-The base path handling is Notes', shared in
-[packages/ui/src/apps/base-path.ts](../../packages/ui/src/apps/base-path.ts).
+paths. The project installs Docs in its config repo, as it does agents: a `docs.ts` re-exporting
+`@iterate-com/docs`'s processors and a pin in its root `package.json`
+([packages/docs](../../packages/docs/README.md)); the page says so when a project hasn't. The page
+signs in on its host's `/.auth/*` and talks to its host's `/api`, both the platform's; Docs has no
+OAuth client, no secrets and no state of its own. The base path handling is Notes', copied from
+iterate's packages/ui to [src/app/base-path.ts](src/app/base-path.ts).
+
+`src/components/ui/` is shadcn's and the rest of `src/components/` that isn't Docs' own (the app
+shell, PostHog, the stream link) is iterate's, from the shadcn registry iterate/packages serves:
+`pnpm exec shadcn add iterate/packages/<name>` re-adds one. `src/app/` holds the few files of
+iterate's `packages/ui/src/apps` and `packages/shared` it uses, each naming where it came from.
 
 - The sidebar picks one of the project's repos and shows its files as a tree (@pierre/trees,
   [src/components/doc-tree.ts](src/components/doc-tree.ts)), following the repo's commits
@@ -47,11 +51,24 @@ The prd iterate project serves it at `docs--iterate.iterate.app` and `docs.itera
 members-only fetch routes on the project, one by routing slug and one by hostname, to the prd
 Worker.
 
-What's next: `tasks/complete/2026-09-30-docs-app.md`,
-"Later".
+What's next: "Later" in the iterate/iterate archive's
+[tasks/complete/2026-09-30-docs-app.md](https://github.com/iterate/iterate/blob/main/tasks/complete/2026-09-30-docs-app.md).
 
-Local dev is Notes': `pnpm dev`, reached through a project behind `iterate tunnel`
-([Notes' README](../notes/README.md)). The browser proof is `test/playwright/docs`.
+Local dev: `pnpm dev` (Vite, with the Cloudflare plugin's local workerd), reached through a project
+like the deployed Worker: behind a tunnel, hot module reloading included. Under paths ingress a
+tunnel's URL is `<platform>/projects/<project>/<name>/`, so the dev server starts under that base
+path, then the tunnel lends it to the project
+([iterate's CLI](https://github.com/iterate/core/blob/main/core/lib/src/cli/README.md#tunnel)):
 
-Deploy: `pnpm --dir packages/docs-app run deploy --env prd`. Docs has no secrets, so it deploys from
-`_shared`'s `prd` Doppler config (`dopplerProject` in [scripts/app.ts](scripts/app.ts)).
+```sh
+pnpm dev --port 5173 --base /projects/my-project/docs-dev/
+iterate tunnel 5173 --project my-project --name docs-dev
+```
+
+Under subdomains the tunnel's host is an origin of its own, and plain `pnpm dev` serves it. Local
+dev signs in against prd's platform; a gitignored `.dev.vars` names another
+(`ITERATE_APP__URLS__OS=http://localhost:8788`).
+
+Deploy: main deploys `preview`, then `prd` (`.depot/workflows/deploy.yml`). By hand,
+`pnpm --dir packages/docs-app run deploy --env prd`. Docs has no secrets, so it deploys with the
+Cloudflare token in Doppler's `_shared` project ([scripts/app.ts](scripts/app.ts)).

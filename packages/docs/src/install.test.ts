@@ -51,9 +51,9 @@ test("installing Docs commits docs.ts, the pin beside the config's other depende
     }),
   };
 
-  expect(
-    await installDocs(project, "https://pkg.pr.new/iterate/private/@iterate-com/docs@abc"),
-  ).toBe("c1");
+  expect(await installDocs(project, "https://pkg.pr.new/iterate/docs/@iterate-com/docs@abc")).toBe(
+    "c1",
+  );
   expect(commits).toMatchObject([
     {
       parent: "c0",
@@ -66,7 +66,7 @@ test("installing Docs commits docs.ts, the pin beside the config's other depende
               name: "config",
               dependencies: {
                 "@iterate-com/voice": "1.0.0",
-                "@iterate-com/docs": "https://pkg.pr.new/iterate/private/@iterate-com/docs@abc",
+                "@iterate-com/docs": "https://pkg.pr.new/iterate/docs/@iterate-com/docs@abc",
               },
             },
             null,
@@ -83,7 +83,7 @@ test("installing Docs commits docs.ts, the pin beside the config's other depende
 
   // installed again: the pointer is there already, and stays as it is
   files["AGENTS.md"] = commits[0].changes[2].content;
-  await installDocs(project, "https://pkg.pr.new/iterate/private/@iterate-com/docs@def");
+  await installDocs(project, "https://pkg.pr.new/iterate/docs/@iterate-com/docs@def");
   expect(commits[1].changes.map((change: any) => change.path)).toEqual(["docs.ts", "package.json"]);
 });
 
@@ -116,7 +116,7 @@ test("a give-up still standing at the deadline ends the install with its reason,
   };
 
   await expect(
-    installDocs(project, "https://pkg.pr.new/iterate/private/@iterate-com/docs@abc"),
+    installDocs(project, "https://pkg.pr.new/iterate/docs/@iterate-com/docs@abc"),
   ).rejects.toThrow(
     "Docs is committed, but the platform could not publish it for now and publishes it later: the config repo's docs.ts: resolving @iterate-com/docs failed: esm.sh answered 500",
   );
@@ -151,6 +151,6 @@ test("installing a pin again after a give-up a later incarnation followed with i
     },
   };
   await expect(
-    installDocs(project, "https://pkg.pr.new/iterate/private/@iterate-com/docs@abc"),
+    installDocs(project, "https://pkg.pr.new/iterate/docs/@iterate-com/docs@abc"),
   ).resolves.toBe("c0");
 });

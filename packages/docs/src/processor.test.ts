@@ -27,6 +27,11 @@ import {
 import { DocProcessor } from "./processor.ts";
 import { DocsProcessor } from "./root.ts";
 
+// The published `iterate` builds `stream/test-support` apart from `stream/processor`, so its
+// declarations carry a second copy of the engine and checkpoint table classes, whose `#private`
+// fields TypeScript tells apart. At runtime the two are interchangeable: what crosses between them
+// here is typed `any`.
+
 test("two people's edits land in one autosave commit, the second as a co-author", async () => {
   // time for Jonas to see Misha's line and add his before the save
   const doc = openDoc({ "plan.md": "# Plan\n" }, { autosave: { idleMs: 200, maxMs: 1000 } });
@@ -265,7 +270,8 @@ test("the root's docs processor tells only the opened docs a commit changed", as
         [Symbol.dispose]: () => {},
       }) as any,
   );
-  root.engines.push(new ProcessorEngine(docs, { stream: root.stream, storage: memoryStorage() }));
+  const storage: any = memoryStorage();
+  root.engines.push(new ProcessorEngine(docs, { stream: root.stream, storage }) as any);
   root.stream.append(
     { type: DOC_OPENED, payload: { repo: "/repos/config", path: "plan.md" } },
     { type: DOC_OPENED, payload: { repo: "/repos/config", path: "notes/retro.md" } },
@@ -302,7 +308,7 @@ function openDoc(
   const repo = fakeRepo(files);
   const storage = nodeSqliteDurableObjectStorage();
   // the engine's checkpoint outlives an incarnation, as the facet's storage does
-  const checkpoints = memoryStorage();
+  const checkpoints: any = memoryStorage();
   const start = (autosave: { idleMs: number; maxMs: number }) => {
     const processor = new DocProcessor({
       sql: storage.sql as unknown as SqlStorage,
@@ -321,7 +327,7 @@ function openDoc(
       autosave,
     });
     const engine = new ProcessorEngine(processor, { stream: log.stream, storage: checkpoints });
-    log.engines.splice(0, log.engines.length, engine);
+    log.engines.splice(0, log.engines.length, engine as any);
     return { processor, engine };
   };
   let current = start(options.autosave);

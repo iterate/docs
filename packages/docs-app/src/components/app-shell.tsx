@@ -1,0 +1,663 @@
+// The one shell for the client apps (dash, agents, notes, docs, voice, admin): the sidebar (the
+// project switcher in its header, the app's own navigation in its body, the collapse button, the
+// account menu and the platform the app is connected to in its footer, the rail) and the page
+// beside it under a header row that carries the phone's sidebar trigger, a page's own row
+// (`AppShellPageHeader`) and its menu (`AppShellPageMenu`) — and ⌘K, a palette over the projects
+// and the sidebar's pages (app-shell-palette.tsx). Router-agnostic on purpose: the app
+// hands over hrefs and its current location, nothing from TanStack comes in here.
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type MouseEvent,
+  type ReactNode,
+  type RefObject,
+} from "react";
+import { createPortal } from "react-dom";
+import {
+  CheckIcon,
+  ChevronsLeftIcon,
+  ChevronsUpDownIcon,
+  EllipsisIcon,
+  EyeIcon,
+  LogOutIcon,
+  SearchIcon,
+  TriangleAlertIcon,
+  UsersIcon,
+} from "lucide-react";
+import { cn } from "cn";
+import type { Principal } from "iterate/principal";
+import {
+  AppShellPalette,
+  PaletteHeaderButton,
+  PaletteSidebarButton,
+  usePaletteShortcut,
+} from "./app-shell-palette.tsx";
+import {
+  readSidebarNav,
+  type AppPaletteEntry,
+  type SidebarNavItem,
+} from "./app-shell-palette-entries.ts";
+import { readConnectedPlatform, type ConnectedPlatform } from "./app-shell-platform.ts";
+import { plainLeftClick } from "#/lib/plain-left-click.ts";
+import { Avatar, AvatarFallback } from "#/components/ui/avatar.tsx";
+import { Button } from "#/components/ui/button.tsx";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "#/components/ui/dropdown-menu.tsx";
+import { IterateLogo } from "#/components/iterate-logo.tsx";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarRail,
+  SidebarTrigger,
+  useSidebar,
+} from "#/components/ui/sidebar.tsx";
+import { Skeleton } from "#/components/ui/skeleton.tsx";
+import { resetPosthog } from "#/components/posthog.tsx";
+
+/** A project as the switcher lists it; `org` is its organization, when the app knows it — grouped
+ *  by the id (two organizations may share a name), labelled by the name. */
+export type AppShellProject = { id: string; slug: string; org?: { id: string; name: string } };
+
+/** Nothing to subscribe to: the cookie has no change event, and `SidebarProvider` reads
+ *  `defaultOpen` once, when it mounts. */
+const subscribeToNothing = () => () => {};
+
+/** Frames a signed-in page. It reads the `sidebar_state` cookie shadcn's provider writes, so the
+ *  sidebar reopens the way it was left — through `useSyncExternalStore`, which keeps the read out
+ *  of render: a server render (the dash's frame before sign-in, routes/_auth.tsx) gets shadcn's
+ *  default, open, until the page hydrates. */
+export function AppShell({
+  app,
+  projects,
+  activeProjectId,
+  projectHref,
+  onNavigate,
+  switcherActions,
+  nav,
+  paletteEntries,
+  searchRow = true,
+  header,
+  account,
+  accountActions,
+  locationKey,
+  children,
+}: {
+  /** the app's name, on top of the switcher: "Agents", "Notes", "Voice" */
+  app: string;
+  /** the projects this session lists; grouped by `org` when the app names one */
+  projects: AppShellProject[];
+  activeProjectId: string | null;
+  /** where the app shows a project (`/projects/<slug>` by convention) — a same-origin href;
+   *  switching is a full navigation unless
+   *  `onNavigate` takes it (an app with a client router prevents the default and navigates itself).
+   *  Only a plain left click is handed over: a modified or middle click keeps the anchor's own
+   *  behaviour (a new tab). */
+  projectHref: (project: AppShellProject) => string;
+  onNavigate?: (href: string, event: MouseEvent<HTMLAnchorElement>) => void;
+  /** the app's own items at the end of the switcher menu — `DropdownMenuItem`s, after a separator */
+  switcherActions?: ReactNode;
+  /** the app's own navigation, its `SidebarGroup`s */
+  nav?: ReactNode;
+  /** rows for ⌘K beside what it reads off `nav`: what the sidebar shows in a way it can't read
+   *  (a file tree in its own shadow DOM) */
+  paletteEntries?: AppPaletteEntry[];
+  /** the sidebar's "Search" row above `nav`; without it, ⌘K and the phone's header button still
+   *  open the palette */
+  searchRow?: boolean;
+  /** what sits beside the phone's sidebar trigger in the header row; without it, a desktop shows
+   *  the row only while a page puts its own in it (`AppShellPageHeader`) */
+  header?: ReactNode;
+  /** who the app is signed in as (`info.principal`); "Sign out" posts to the SDK's `/.auth/logout`,
+   *  "Switch account…" signs in again through the issuer's consent. A platform admin signed in as
+   *  someone (`impersonatedBy`) sees whom and who they are, above the account menu, with Stop
+   *  impersonating, which signs in again the same way (the issuer still knows them). None while the
+   *  app is still signing in: a placeholder of the menu's height holds its place. */
+  account?: Principal;
+  /** the app's own items in the account menu, before Sign out — `DropdownMenuItem`s */
+  accountActions?: ReactNode;
+  /** the router's current href — a change closes the phone's sidebar sheet */
+  locationKey: string;
+  children: ReactNode;
+}) {
+  const platform = useConnectedPlatform();
+  const defaultOpen = useSyncExternalStore(
+    subscribeToNothing,
+    () => !document.cookie.split("; ").includes("sidebar_state=false"),
+    () => true,
+  );
+  // the palette: the sidebar's navigation as it read when ⌘K opened it, null while closed
+  const navRef = useRef<HTMLDivElement>(null);
+  const [palette, setPalette] = useState<SidebarNavItem[] | null>(null);
+  const openPalette = () => setPalette(readSidebarNav(navRef.current));
+  // the header row's middle and end, where a page's own row (`AppShellPageHeader`) and its menu
+  // (`AppShellPageMenu`) go
+  const [pageHeaderSlot, setPageHeaderSlot] = useState<HTMLElement | null>(null);
+  const [pageMenuSlot, setPageMenuSlot] = useState<HTMLElement | null>(null);
+  usePaletteShortcut(
+    useCallback(() => setPalette((open) => (open ? null : readSidebarNav(navRef.current))), []),
+  );
+  return (
+    <SidebarProvider defaultOpen={defaultOpen} className="h-svh">
+      {/* outside <Sidebar>: on a phone its children live in a Sheet that remounts when opened */}
+      <CloseMobileSidebarOnNavigate locationKey={locationKey} />
+      <Sidebar collapsible="icon">
+        <SidebarHeader>
+          <ProjectSwitcher
+            app={app}
+            projects={projects}
+            activeProjectId={activeProjectId}
+            projectHref={projectHref}
+            onNavigate={onNavigate}
+            actions={switcherActions}
+          />
+          {searchRow ? <PaletteSidebarButton onOpen={openPalette} /> : null}
+        </SidebarHeader>
+        {/* ⌘K lists what the sidebar shows here — on a desktop; a phone's lists the projects alone */}
+        <SidebarNav navRef={navRef}>{nav}</SidebarNav>
+        <SidebarFooter>
+          <CollapseButton />
+          {account?.impersonatedBy ? (
+            <ImpersonationMarker
+              email={account.email || account.actor}
+              admin={account.impersonatedBy.email}
+            />
+          ) : null}
+          {account ? (
+            <AccountMenu
+              email={account.email || account.actor}
+              actions={accountActions}
+              platform={platform}
+            />
+          ) : (
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarRowSkeleton className="h-12" />
+              </SidebarMenuItem>
+            </SidebarMenu>
+          )}
+        </SidebarFooter>
+        <SidebarRail />
+      </Sidebar>
+      <SidebarInset className="min-w-0 overflow-hidden">
+        <header
+          className={cn(
+            "group/header flex shrink-0 items-center gap-3 px-4 pt-2.5 pb-1",
+            // a page's own row is a toolbar: even padding, a rule under it
+            "has-[[data-page-header]]:border-b has-[[data-page-header]]:py-1.5",
+            // the trigger, Search and the ⋯ are a phone's: on a desktop the row would be empty
+            !header && "md:hidden md:has-[[data-page-header]]:flex",
+          )}
+        >
+          <SidebarTrigger className="-ml-1 md:hidden" title="Toggle sidebar" />
+          {/* in a page's menu instead on a phone, while it has one */}
+          <div
+            className={cn(
+              "flex min-w-0 items-center gap-3 max-md:group-has-[[data-page-menu]]/header:hidden",
+              !header && "md:hidden",
+            )}
+          >
+            <PaletteHeaderButton onOpen={openPalette} />
+            {header}
+          </div>
+          <div ref={setPageHeaderSlot} className="flex min-w-0 flex-1 items-center empty:hidden" />
+          <div ref={setPageMenuSlot} className="ml-auto flex items-center md:hidden" />
+        </header>
+        <PageSlotsContext
+          value={{ header: pageHeaderSlot, menu: pageMenuSlot, openPalette, appHeader: header }}
+        >
+          <div className="flex min-h-0 flex-1 flex-col overflow-auto">{children}</div>
+        </PageSlotsContext>
+      </SidebarInset>
+      <AppShellPalette
+        nav={palette}
+        entries={paletteEntries || []}
+        onClose={() => setPalette(null)}
+        projects={projects}
+        activeProjectId={activeProjectId}
+        projectHref={projectHref}
+        onNavigate={onNavigate}
+      />
+    </SidebarProvider>
+  );
+}
+
+const PageSlotsContext = createContext<{
+  header: HTMLElement | null;
+  menu: HTMLElement | null;
+  openPalette: () => void;
+  /** the app's `header`, which a phone shows in the page's menu */
+  appHeader: ReactNode;
+} | null>(null);
+
+/** A page's own row of the header: what it shows above itself (a doc's path and its controls), in
+ *  the row the shell has anyway, between the phone's sidebar trigger and the page's ⋯. The row gets
+ *  a rule under it while a page has one, and a desktop shows it then even when the app gave the
+ *  shell no `header`. */
+export function AppShellPageHeader({ children }: { children: ReactNode }) {
+  const shell = useContext(PageSlotsContext);
+  if (!shell) throw new Error("AppShellPageHeader is drawn inside an AppShell");
+  if (!shell.header) return null;
+  return createPortal(
+    // one line on a phone, where the page's controls are in its ⋯: what's too long truncates
+    <div data-page-header className="flex min-w-0 flex-1 items-center gap-x-4 gap-y-1 md:flex-wrap">
+      {children}
+    </div>,
+    shell.header,
+  );
+}
+
+/** A page's own controls on a phone, behind a ⋯ at the end of the header row: the row's `header`
+ *  and Search move in above them, so the row is the sidebar trigger and the ⋯ alone. `children`
+ *  are `DropdownMenuItem`s (in `DropdownMenuGroup`s). Hidden from `md` up, where the page shows
+ *  its controls itself: the page hides them below `md`, so one breakpoint decides both, in CSS. */
+export function AppShellPageMenu({ children }: { children: ReactNode }) {
+  const shell = useContext(PageSlotsContext);
+  if (!shell) throw new Error("AppShellPageMenu is drawn inside an AppShell");
+  if (!shell.menu) return null;
+  return createPortal(
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        data-page-menu
+        render={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="md:hidden"
+            aria-label="More"
+            title="More"
+          />
+        }
+      >
+        <EllipsisIcon />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-56 rounded-lg">
+        {shell.appHeader ? <div className="px-1.5 py-1">{shell.appHeader}</div> : null}
+        <DropdownMenuGroup>
+          <DropdownMenuItem onClick={shell.openPalette}>
+            <SearchIcon />
+            Search
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        {children}
+      </DropdownMenuContent>
+    </DropdownMenu>,
+    shell.menu,
+  );
+}
+
+/** A sidebar row while what it names loads: `SidebarMenuSkeleton`'s shape at a fixed width, so a
+ *  server render hydrates as it was drawn (the vendored one picks its width at random). */
+export function SidebarRowSkeleton({ className }: { className?: string }) {
+  return (
+    <div className={cn("flex h-8 items-center gap-2 px-2", className)}>
+      <Skeleton className="size-4 rounded-md" />
+      <Skeleton className="h-4 w-2/3" />
+    </div>
+  );
+}
+
+/** Dismiss the mobile sidebar (a Sheet) when the page navigates — shadcn's Sidebar exposes
+ *  `setOpenMobile` and does not do this itself. The whole href counts, not the pathname: the apps
+ *  navigate by search string (`/agents?project=…&agent=…`). Only on an actual change, never on
+ *  mount: the Sheet remounts its children when opened. */
+function CloseMobileSidebarOnNavigate({ locationKey }: { locationKey: string }) {
+  const { setOpenMobile } = useSidebar();
+  const previousLocationKeyRef = useRef(locationKey);
+  useEffect(() => {
+    if (previousLocationKeyRef.current === locationKey) return;
+    previousLocationKeyRef.current = locationKey;
+    setOpenMobile(false);
+  }, [locationKey, setOpenMobile]);
+  return null;
+}
+
+/** The app's navigation. On a phone, a same-tab link click in it closes the sidebar sheet at once,
+ *  as the navigation starts; shadcn leaves it open (https://github.com/shadcn-ui/ui/issues/5561),
+ *  and `CloseMobileSidebarOnNavigate` only fires once the location has changed. A modified or
+ *  middle click, a download, or a link to another tab leaves the sheet open, as does a button (the
+ *  collapse button, a dropdown trigger). This used to live in the vendored sidebar.tsx's
+ *  SidebarMenuButton (iterate/iterate#1984); a vendored file stays byte-identical to upstream
+ *  (packages/ui/AGENTS.md). */
+function SidebarNav({
+  navRef,
+  children,
+}: {
+  navRef: RefObject<HTMLDivElement | null>;
+  children: ReactNode;
+}) {
+  const { isMobile, setOpenMobile } = useSidebar();
+  return (
+    <SidebarContent
+      ref={navRef}
+      onClick={(event) => {
+        if (!isMobile) return;
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+          return;
+        const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
+        if (!link || !event.currentTarget.contains(link) || link.hasAttribute("download")) return;
+        const target = link.getAttribute("target");
+        if (target && target !== "_self") return;
+        setOpenMobile(false);
+      }}
+    >
+      {children}
+    </SidebarContent>
+  );
+}
+
+function ProjectSwitcher({
+  app,
+  projects,
+  activeProjectId,
+  projectHref,
+  onNavigate,
+  actions,
+}: {
+  app: string;
+  projects: AppShellProject[];
+  activeProjectId: string | null;
+  projectHref: (project: AppShellProject) => string;
+  onNavigate?: (href: string, event: MouseEvent<HTMLAnchorElement>) => void;
+  actions?: ReactNode;
+}) {
+  const { isMobile } = useSidebar();
+  // one group per organization (by id), in order of first appearance; a bare list when the app
+  // names none
+  const orgs = [...new Map(projects.map((project) => [project.org?.id, project.org])).values()];
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <SidebarMenuButton
+                size="lg"
+                className="data-popup-open:bg-sidebar-accent data-popup-open:text-sidebar-accent-foreground"
+                aria-label="Switch project"
+              >
+                <span className="flex aspect-square size-8 items-center justify-center rounded-md bg-black">
+                  <IterateLogo alt="" className="size-6" />
+                </span>
+                <span className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-medium">{app}</span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    {projects.find((project) => project.id === activeProjectId)?.slug ||
+                      "(select project)"}
+                  </span>
+                </span>
+                <ChevronsUpDownIcon className="ml-auto" />
+              </SidebarMenuButton>
+            }
+          />
+          <DropdownMenuContent
+            align="start"
+            side={isMobile ? "bottom" : "right"}
+            sideOffset={4}
+            className="min-w-60 rounded-lg"
+          >
+            {projects.length === 0 ? (
+              <DropdownMenuItem disabled className="p-2">
+                No projects yet
+              </DropdownMenuItem>
+            ) : null}
+            {orgs.map((org) => (
+              <DropdownMenuGroup key={org?.id || ""}>
+                {/* Base UI: a menu label lives inside a group, never bare in the menu */}
+                {org ? (
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">
+                    {org.name}
+                  </DropdownMenuLabel>
+                ) : null}
+                {projects
+                  .filter((project) => project.org?.id === org?.id)
+                  .map((project) => (
+                    <DropdownMenuItem
+                      key={project.id}
+                      className="gap-2 p-2"
+                      render={
+                        <a
+                          href={projectHref(project)}
+                          aria-label={`Switch to ${project.slug}`}
+                          onClick={
+                            onNavigate
+                              ? (event) => {
+                                  if (!plainLeftClick(event)) return;
+                                  onNavigate(projectHref(project), event);
+                                }
+                              : undefined
+                          }
+                        />
+                      }
+                    >
+                      <span className="flex size-6 items-center justify-center rounded-md border text-xs font-medium text-muted-foreground">
+                        {project.slug.slice(0, 1)}
+                      </span>
+                      <span className="truncate">{project.slug}</span>
+                      {project.id === activeProjectId ? <CheckIcon className="ml-auto" /> : null}
+                    </DropdownMenuItem>
+                  ))}
+              </DropdownMenuGroup>
+            ))}
+            {actions ? (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>{actions}</DropdownMenuGroup>
+              </>
+            ) : null}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </SidebarMenuItem>
+    </SidebarMenu>
+  );
+}
+
+function CollapseButton() {
+  const { state, toggleSidebar } = useSidebar();
+  const collapsed = state === "collapsed";
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <SidebarMenuButton
+          type="button"
+          size="sm"
+          className="text-sidebar-foreground/70"
+          tooltip={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          onClick={toggleSidebar}
+        >
+          <ChevronsLeftIcon className={collapsed ? "rotate-180" : undefined} />
+          <span>Collapse sidebar</span>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    </SidebarMenu>
+  );
+}
+
+/** The page's one read of the gate, and its answer once it has one. */
+let platformRead: Promise<void> | undefined;
+let platformAnswer: ConnectedPlatform | null = null;
+
+/** Connecting to another platform is a full page load (`/.auth/connect`), so the shell reads
+ *  once, including while the account loads. A remounted shell can use the cached answer. */
+function useConnectedPlatform() {
+  const [platform, setPlatform] = useState(platformAnswer);
+  useEffect(() => {
+    let mounted = true;
+    platformRead ||= readConnectedPlatform(AbortSignal.timeout(10_000)).then(
+      (answer) => {
+        platformAnswer = answer;
+      },
+      () => {},
+    );
+    void platformRead.then(() => mounted && setPlatform(platformAnswer));
+    return () => {
+      mounted = false;
+    };
+  }, []);
+  return platform;
+}
+
+/** SIGN IN AGAIN, through the issuer: the app's own logout (ends this sign-in's grant), then its
+ *  login with the same permissions (app-server.ts), which finds the person still signed in at the
+ *  issuer and shows its consent — where a platform admin may "Sign in as someone else…" — and lands
+ *  on the app's root (not the page shown: it is often another person's project). */
+const SIGN_IN_AGAIN = `/.auth/logout?${new URLSearchParams({ next: "/.auth/login?next=/" })}`;
+
+/** SIGNED IN AS SOMEONE ELSE, unmissable: whom, who you are, and Stop — signing in again as
+ *  yourself (`SIGN_IN_AGAIN`). A collapsed sidebar keeps the eye. */
+function ImpersonationMarker({ email, admin }: { email: string; admin: string }) {
+  return (
+    <form
+      method="post"
+      action={SIGN_IN_AGAIN}
+      role="status"
+      className="flex flex-col gap-1.5 rounded-lg border border-warning/40 bg-warning/10 p-2 text-xs text-foreground group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:p-1.5"
+    >
+      <div className="flex items-center gap-2">
+        <EyeIcon className="size-4 shrink-0" aria-label="Signed in as someone else" />
+        <span className="min-w-0 truncate group-data-[collapsible=icon]:hidden">
+          Signed in as <strong className="font-semibold">{email}</strong>
+        </span>
+      </div>
+      <span className="truncate text-warning group-data-[collapsible=icon]:hidden">
+        You are {admin}
+      </span>
+      <button
+        type="submit"
+        className="rounded-md bg-warning px-2 py-1 font-medium text-primary-foreground hover:bg-warning/90 group-data-[collapsible=icon]:hidden"
+      >
+        Stop impersonating
+      </button>
+    </form>
+  );
+}
+
+/** The deployment beneath the account in the sidebar: quiet when it is the app's default. Any other
+ *  is orange with a warning mark, as it is again in the account menu (`DeploymentNote`). */
+function DeploymentLine({ platform }: { platform: ConnectedPlatform }) {
+  if (platform.isDefault)
+    return <span className="truncate text-xs text-muted-foreground">{platform.host}</span>;
+  return (
+    <span className="flex min-w-0 items-center gap-1 text-xs text-warning">
+      {/* important: the menu button sets every svg in it to size-4 */}
+      <TriangleAlertIcon aria-hidden className="size-3!" />
+      <span className="truncate">{platform.host}</span>
+    </span>
+  );
+}
+
+/** The deployment in the account menu, its host in full. A custom one repeats the sidebar line's
+ *  mark and orange. */
+function DeploymentNote({ platform }: { platform: ConnectedPlatform }) {
+  if (platform.isDefault)
+    return (
+      <div className="flex flex-col gap-0.5 px-1.5 pt-1 pb-1.5 text-xs">
+        <span className="text-muted-foreground">Deployment</span>
+        <span className="min-w-0 font-medium wrap-anywhere">{platform.host}</span>
+      </div>
+    );
+  return (
+    <div className="flex flex-col gap-0.5 px-1.5 pt-1 pb-1.5 text-xs">
+      <span className="text-muted-foreground">Custom deployment</span>
+      <span className="flex items-start gap-1 font-medium text-warning">
+        <TriangleAlertIcon aria-hidden className="mt-0.5 size-3 shrink-0" />
+        <span className="min-w-0 wrap-anywhere">{platform.host}</span>
+      </span>
+    </div>
+  );
+}
+
+/** The signed-in person and the deployment the app is connected to; Switch account…
+ *  (`SIGN_IN_AGAIN`); and sign out: a POST to the app's own logout, which ends this browser's grant
+ *  at the issuer. */
+function AccountMenu({
+  email,
+  actions,
+  platform,
+}: {
+  email: string;
+  actions?: ReactNode;
+  platform: ConnectedPlatform | null;
+}) {
+  const { isMobile } = useSidebar();
+  const logout = useRef<HTMLFormElement>(null);
+  const switchAccount = useRef<HTMLFormElement>(null);
+  const initials = email.slice(0, 2).toUpperCase();
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <SidebarMenuButton
+                size="lg"
+                className="h-auto min-h-12 group-data-[collapsible=icon]:min-h-0 data-popup-open:bg-sidebar-accent data-popup-open:text-sidebar-accent-foreground"
+                aria-label="Account"
+              >
+                <Avatar className="size-8 rounded-lg">
+                  <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
+                </Avatar>
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-left group-data-[collapsible=icon]:hidden">
+                  <span className="truncate text-sm font-medium">{email}</span>
+                  {platform ? <DeploymentLine platform={platform} /> : null}
+                </span>
+                <ChevronsUpDownIcon className="ml-auto" />
+              </SidebarMenuButton>
+            }
+          />
+          <DropdownMenuContent
+            className="min-w-56 rounded-lg"
+            side={isMobile ? "bottom" : "right"}
+            align="end"
+            sideOffset={4}
+          >
+            {/* Base UI: a menu label lives inside a group, never bare in the menu */}
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="truncate font-normal">{email}</DropdownMenuLabel>
+              {platform ? <DeploymentNote platform={platform} /> : null}
+              {actions}
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuItem onClick={() => switchAccount.current?.requestSubmit()}>
+                <UsersIcon />
+                <span>Switch account…</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  resetPosthog();
+                  logout.current?.requestSubmit();
+                }}
+              >
+                <LogOutIcon />
+                <span>Sign out</span>
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </SidebarMenuItem>
+      {/* the POSTs, outside the menu items so nothing but an item's click submits one */}
+      <form ref={switchAccount} method="post" action={SIGN_IN_AGAIN} hidden />
+      <form ref={logout} method="post" action="/.auth/logout" hidden />
+    </SidebarMenu>
+  );
+}

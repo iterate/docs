@@ -1,0 +1,16 @@
+# THE SETUP OF A JOB ON DEPOT'S STOCK IMAGE, after its checkout: `uses: ./.depot/actions/setup`.
+# Node, pnpm and the Doppler CLI (scripts/ci/toolchain.sh), then the install. Docs' install takes
+# seconds from the npm registry, so no store is cached.
+name: Setup
+description: Node, pnpm and the Doppler CLI, and the install
+runs:
+  using: composite
+  steps:
+    - name: Toolchain
+      shell: bash
+      run: |
+        bash scripts/ci/toolchain.sh start
+        bash scripts/ci/toolchain.sh wait
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile

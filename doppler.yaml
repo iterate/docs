@@ -1,0 +1,5 @@
+# `doppler run` in the Docs app reads project `_shared`, which holds the Cloudflare token every
+# iterate app deploys with. The deploy script names its own config (envs.ts `dopplerConfig`).
+setup:
+  - project: _shared
+    path: ./

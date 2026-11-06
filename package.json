@@ -1,0 +1,28 @@
+{
+  "name": "iterate-docs",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "typecheck": "pnpm -r --parallel typecheck && tsc -p scripts",
+    "lint": "oxlint . --deny-warnings --report-unused-disable-directives-severity error",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "test": "pnpm -r --parallel test && vitest run --root scripts"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "iterate": "catalog:",
+    "oxfmt": "^0.70.0",
+    "oxlint": "^1.85.0",
+    "pkg-pr-new": "0.0.79",
+    "trpc-cli": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "zod": "catalog:"
+  },
+  "engines": {
+    "node": ">=24.11.1"
+  },
+  "packageManager": "pnpm@10.24.0"
+}

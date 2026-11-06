@@ -1,0 +1,21 @@
+.DS_Store
+node_modules
+*.tsbuildinfo
+
+# TanStack and Vite
+.tanstack
+dist
+
+# Cloudflare
+.mf
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
+
+__pycache__/
+
+# ad-hoc ignored files/paths
+*ignoreme*
+*.log

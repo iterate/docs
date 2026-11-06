@@ -335,7 +335,7 @@ export class DocProcessor extends StreamProcessor<DocState> {
     // the file deleted at the tip: the live text stays in the open tabs; a delete of a doc with no
     // unsaved edits stands (until someone edits it again), and unsaved edits are dirty against a
     // base of nothing, so the next save writes the doc back with them
-    // oxlint-disable-next-line iterate/simple-truthiness-check -- only a deleted file is null; an emptied one is "" and merges like any edit
+    // only a deleted file is null; an emptied one is "" and merges like any edit
     const deleted = theirs === null;
     const theirsText = deleted ? ours : theirs || "";
     const merged = unsaved ? mergeText(ours, this.#base.text, theirsText).text : theirsText;

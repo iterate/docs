@@ -6,17 +6,17 @@ import { z } from "zod";
 import type { IterateContextApi } from "iterate/api";
 import { docContextPath } from "@iterate-com/docs/frames";
 import { docsModule, ensureDoc, installDocs } from "@iterate-com/docs/install";
-import { buildVersion, pinVersion } from "iterate/package-builds";
-import { startAppConfigOf } from "@iterate-com/shared/start-app-config";
-import { Button } from "@iterate-com/ui/components/ui/button";
-import { Spinner } from "@iterate-com/ui/components/ui/spinner";
+import { NPM_MAIN, pinVersion } from "iterate/package-builds";
+import { startAppConfigOf } from "#/app/start-app-config.ts";
+import { Button } from "#/components/ui/button.tsx";
+import { Spinner } from "#/components/ui/spinner.tsx";
 import {
   Empty,
   EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
-} from "@iterate-com/ui/components/ui/empty";
+} from "#/components/ui/empty.tsx";
 import { DocEditor } from "../../components/doc-editor.tsx";
 import { DocSession } from "../../editor/doc-session.ts";
 import { repoPath } from "../../lib/docs-repo.ts";
@@ -24,12 +24,15 @@ import { fileKind } from "../../lib/file-kind.ts";
 
 /** The @iterate-com/docs build this deployment installs in a project (`ITERATE_APP pkgPrNewRef`):
  *  production's `main` is the npm version main's dist-tag names now, and a per-commit deployment's
- *  commit its own pkg.pr.new build (iterate/package-builds `buildVersion`). Asked in the app's Worker,
- *  as pkg.pr.new's headers are no page's to read. */
+ *  commit this repo's pkg.pr.new build of it (.github/workflows/pkg-pr-new.yml). Asked in the app's
+ *  Worker, as pkg.pr.new's headers are no page's to read. iterate/package-builds `buildVersion`
+ *  names iterate/private's builds, so not that. */
 const docsBuild = createServerFn({ method: "GET" }).handler(async () => {
   const { env } = await import("cloudflare:workers");
   const ref = startAppConfigOf(env).pkgPrNewRef;
-  return pinVersion("@iterate-com/docs", buildVersion("@iterate-com/docs", ref));
+  const version =
+    ref === NPM_MAIN ? NPM_MAIN : `https://pkg.pr.new/iterate/docs/@iterate-com/docs@${ref}`;
+  return pinVersion("@iterate-com/docs", version);
 });
 
 /** One doc: `/projects/<slug>/<repo name>/<path in the repo>`, read at the repo's tip for the
@@ -52,7 +55,7 @@ export const Route = createFileRoute("/_auth/projects/$slug/$repo/$")({
       using config = itx.repos.get("/repos/config");
       return await Promise.all([repo.readFile(path), config.readFile(docsModule.path)]);
     });
-    // oxlint-disable-next-line iterate/simple-truthiness-check -- an empty doc is "" and a real doc; a missing one is null
+    // an empty doc is "" and a real doc; a missing one is null
     if (text === null) throw notFound();
     return { repo: params.repo, path, kind, text, installed: Boolean(docsModuleSource) };
   },

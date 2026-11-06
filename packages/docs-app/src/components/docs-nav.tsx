@@ -5,8 +5,8 @@ import { useMemo } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Link, useNavigate, useRouteContext, useRouter } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
-import { Spinner } from "@iterate-com/ui/components/ui/spinner";
-import { NativeSelect, NativeSelectOption } from "@iterate-com/ui/components/ui/native-select";
+import { Spinner } from "#/components/ui/spinner.tsx";
+import { NativeSelect, NativeSelectOption } from "#/components/ui/native-select.tsx";
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -14,7 +14,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@iterate-com/ui/components/ui/sidebar";
+} from "#/components/ui/sidebar.tsx";
 import { authorOf } from "../lib/author.ts";
 import { createDoc } from "../lib/create-doc.ts";
 import { useDocList } from "../lib/doc-list.ts";

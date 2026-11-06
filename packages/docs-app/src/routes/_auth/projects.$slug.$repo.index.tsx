@@ -1,8 +1,8 @@
 import { useMutation } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import type { FormEvent } from "react";
-import { Button } from "@iterate-com/ui/components/ui/button";
-import { Input } from "@iterate-com/ui/components/ui/input";
+import { Button } from "#/components/ui/button.tsx";
+import { Input } from "#/components/ui/input.tsx";
 import { useDocList } from "../../lib/doc-list.ts";
 import { authorOf } from "../../lib/author.ts";
 import { createDoc } from "../../lib/create-doc.ts";

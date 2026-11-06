@@ -1,0 +1,33 @@
+name: pkg.pr.new
+# Every main commit and every pull request's head publishes @iterate-com/docs to pkg.pr.new, so any
+# of them is installable: pkg.pr.new/iterate/docs/@iterate-com/docs@<sha>. A project pins one to try
+# a pull request's processors, and the Docs app a per-commit deployment builds installs its own
+# commit's (projects.$slug.$repo.$.tsx `docsBuild`). main's npm publish (npm-publish.yml) publishes
+# the same packages, by this list.
+#
+# A GitHub Actions workflow, not Depot's: pkg.pr.new's GitHub App authenticates the run by its
+# GitHub token.
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - run: pnpm install --frozen-lockfile --filter iterate-docs --filter @iterate-com/docs...
+      - run: pnpm --dir packages/docs build
+      # --pnpm: pack with `pnpm pack` so publishConfig.exports (dist remap) is applied and `catalog:`
+      # becomes a version; `npm pack` would ship the dev exports pointing at src/. npm-publish.ts
+      # reads the packages off this line.
+      - run: pnpm exec pkg-pr-new publish --pnpm ./packages/docs

@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { createIterateClient } from "iterate/app";
-import { usePosthogIdentity } from "@iterate-com/ui/components/posthog";
-import { ProjectAppFrame } from "@iterate-com/ui/components/project-app-shell";
+import { usePosthogIdentity } from "#/components/posthog.tsx";
+import { ProjectAppFrame } from "#/components/project-app-shell.tsx";
 const iterate = createIterateClient();
 export const Route = createFileRoute("/_auth")({
   ssr: false,
