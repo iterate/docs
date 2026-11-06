@@ -13,6 +13,7 @@ pnpm typecheck
 pnpm lint
 pnpm format
 pnpm test
+pnpm spec   # the browser specs (test/playwright.config.ts says against what)
 ```
 
 ## Releases and deploys
@@ -22,9 +23,11 @@ pnpm test
 - **npm**: every main commit whose packed package changed publishes
   `<version>-main.<commit date>-<sha>` under the `main` and `latest` dist-tags
   (`.github/workflows/npm-publish.yml`, `scripts/ci/npm-publish.ts`).
-- **The app**: main deploys `preview` (docs.iterate-dev-preview.workers.dev), then `prd`
-  (docs.iterate.workers.dev), both in `envs.ts` (`.depot/workflows/deploy.yml`). A red run pages
-  #error-pulse.
+- **The app**: main deploys `preview` (docs.iterate-dev-preview.workers.dev), runs the browser
+  specs against it, then deploys `prd` (docs.iterate.workers.dev), all in `envs.ts`
+  (`.depot/workflows/deploy.yml`). A red run pages #error-pulse.
+- **A pull request** gets its own Worker, `docs-pr<N>`, and the browser specs against it, on main on
+  dev's platform (`.depot/workflows/specs.yml`); it's deleted when the pull request closes.
 
 CI runs on [Depot](https://depot.dev) (`.depot/workflows/`); its one secret is the org's
 `DOPPLER_TOKEN`. pkg.pr.new and npm run on GitHub Actions, which their GitHub App and trusted

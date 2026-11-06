@@ -1,0 +1,19 @@
+{
+  "name": "@iterate-com/docs-specs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@iterate-com/docs": "workspace:*",
+    "@playwright/test": "1.63.0",
+    "@types/node": "catalog:",
+    "capnweb": "npm:@iterate-com/capnweb@0.13.0",
+    "iterate": "catalog:",
+    "middlewright": "https://pkg.pr.new/middlewright@20eacef",
+    "playwright": "1.63.0",
+    "typescript": "catalog:",
+    "zod": "catalog:"
+  }
+}

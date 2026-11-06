@@ -69,6 +69,14 @@ Under subdomains the tunnel's host is an origin of its own, and plain `pnpm dev`
 dev signs in against prd's platform; a gitignored `.dev.vars` names another
 (`ITERATE_APP__URLS__OS=http://localhost:8788`).
 
-Deploy: main deploys `preview`, then `prd` (`.depot/workflows/deploy.yml`). By hand,
+The browser specs are the root's `test/playwright/docs`: CI runs them against each pull request's
+own Worker, and against `preview` before main deploys prd. By hand, against any Docs Worker:
+
+```sh
+doppler run --project os --config preview -- env WORKER_BASE_URL=https://os.iterate-dev-preview.workers.dev \
+  DOCS_BASE_URL=https://docs-pr12.iterate-dev-preview.workers.dev pnpm spec
+```
+
+Deploy: main deploys `preview`, then `prd` once the specs pass (`.depot/workflows/deploy.yml`). By hand,
 `pnpm --dir packages/docs-app run deploy --env prd`. Docs has no secrets, so it deploys with the
 Cloudflare token in Doppler's `_shared` project ([scripts/app.ts](scripts/app.ts)).

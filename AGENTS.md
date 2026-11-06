@@ -4,7 +4,9 @@
 [README.md](README.md) first, then the package's own README. `packages/docs/AGENTS.md` is for agents
 working on a project's docs through the platform, not on this repo.
 
-- Before pushing: `pnpm typecheck && pnpm lint && pnpm format && pnpm test`.
+- Before pushing: `pnpm typecheck && pnpm lint && pnpm format && pnpm test`. The browser specs
+  (`pnpm spec`, `test/playwright/docs`) need a deployed Docs: `test/playwright.config.ts` says how.
+- `test/helpers/` is iterate/private's spec harness, copied: keep it close to the original.
 - Never hand-edit `packages/docs-app/src/routeTree.gen.ts`: `pnpm --dir packages/docs-app routes:generate`.
 - `envs.ts` owns the deployments; Doppler project `_shared` holds the deploy credentials. Main
   deploys itself (`.depot/workflows/deploy.yml`). Workers are never deleted.

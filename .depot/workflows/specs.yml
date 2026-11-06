@@ -1,0 +1,54 @@
+name: Specs
+
+# A PULL REQUEST'S DOCS UNDER ITS BROWSER SPECS (test/playwright/docs): its head deployed as a Worker
+# of its own on the dev/preview account (`docs-pr<N>`, envs.ts `pullRequestEnv`), served through
+# fixture projects on main on dev's platform (os.iterate-dev-preview.workers.dev), each installing
+# the head's @iterate-com/docs from pkg.pr.new (.github/workflows/pkg-pr-new.yml, which the specs
+# wait for). The Worker is deleted when the pull request closes (pull-request-closed.yml). Main's
+# specs run in deploy.yml, against `preview`, before prd.
+permissions:
+  contents: read
+
+on:
+  pull_request:
+
+concurrency:
+  group: specs-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  specs:
+    name: Browser specs
+    # six browsers at once (test/playwright.config.ts `workers`)
+    runs-on: depot-ubuntu-24.04-4
+    timeout-minutes: 30
+    env:
+      # the head pkg.pr.new published, not the merge commit a pull request's run checks out
+      PUBLISHED_PACKAGE_COMMIT: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Setup
+        uses: ./.depot/actions/setup
+      - name: Browser
+        run: pnpm --dir test exec playwright install --only-shell chromium
+      - name: Deploy the pull request's Docs
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        run: pnpm --dir packages/docs-app run-script deploy --env pr${{ github.event.pull_request.number }}
+      - name: Specs
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+          WORKER_BASE_URL: https://os.iterate-dev-preview.workers.dev
+          DOCS_BASE_URL: https://docs-pr${{ github.event.pull_request.number }}.iterate-dev-preview.workers.dev
+        run: doppler run --project os --config preview -- pnpm spec
+      - name: Upload the report
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: test-results/
+          retention-days: 14

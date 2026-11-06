@@ -8,7 +8,8 @@
     "lint": "oxlint . --deny-warnings --report-unused-disable-directives-severity error",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "test": "pnpm -r --parallel test && vitest run --root scripts"
+    "test": "pnpm -r --parallel test && vitest run --root scripts",
+    "spec": "pnpm --dir test exec playwright test"
   },
   "devDependencies": {
     "@types/node": "catalog:",

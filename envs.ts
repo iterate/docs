@@ -60,11 +60,27 @@ export const docsEnvs = {
   },
 } satisfies Record<string, DocsEnv>;
 
+/** A PULL REQUEST'S OWN DOCS, `pr<N>`: `docs-pr<N>` on the dev/preview account, linked as `preview`
+ *  is, which its CI deploys and runs the browser specs against (.depot/workflows/specs.yml) and
+ *  deletes once it closes (.depot/workflows/pull-request-closed.yml). It installs the pull
+ *  request's own @iterate-com/docs build (vite.config.ts `pkgPrNewRef`). Undefined for any other
+ *  name. */
+export function pullRequestEnv(name: string): DocsEnv | undefined {
+  const number = /^pr(\d+)$/.exec(name)?.[1];
+  if (!number) return undefined;
+  const workerName = `docs-pr${number}`;
+  return {
+    ...docsEnvs.preview,
+    workerName,
+    baseUrl: `https://${workerName}.iterate-dev-preview.workers.dev`,
+  };
+}
+
 export function getEnv(name: string): DocsEnv {
-  const env = (docsEnvs as Record<string, DocsEnv>)[name];
+  const env = (docsEnvs as Record<string, DocsEnv>)[name] || pullRequestEnv(name);
   if (!env)
     throw new Error(
-      `unknown env ${JSON.stringify(name)}; known envs: ${Object.keys(docsEnvs).join(", ")}`,
+      `unknown env ${JSON.stringify(name)}; known envs: ${Object.keys(docsEnvs).join(", ")}, pr<N>`,
     );
   return env;
 }

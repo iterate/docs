@@ -11,7 +11,8 @@
     "typecheck": "pnpm routes:check && tsc --noEmit",
     "deploy": "node scripts/app.ts deploy",
     "routes:generate": "node scripts/app.ts generate-route-tree",
-    "routes:check": "node scripts/app.ts generate-route-tree --check"
+    "routes:check": "node scripts/app.ts generate-route-tree --check",
+    "delete-pull-request": "node scripts/app.ts delete-pull-request"
   },
   "dependencies": {
     "@atomic-editor/editor": "0.6.2",
